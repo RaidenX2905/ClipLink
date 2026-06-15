@@ -1,4 +1,4 @@
-# ClipLink 🚀
+# ClipLink
 
 A modern, light, and premium URL shortener built with **React**, **Vite**, and **Express**. 
 
