@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/brand-mark-dark-512.png" alt="ClipLink Brand Mark" width="128" height="128">
+</p>
+
 <div align="center">
 
 # ClipLink
