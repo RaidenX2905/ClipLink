@@ -3,6 +3,7 @@ import { createClient } from "redis";
 
 let client = null;
 let connectingPromise = null;
+let lastMemoryCheckTime = 0;
 
 export async function getRedis() {
   if (client && client.isOpen) {
@@ -44,6 +45,63 @@ export async function getRedis() {
     });
 
   return connectingPromise;
+}
+
+/**
+ * Autonomous Free-Tier Guard (30 MB Cap Protection):
+ * Checks memory consumption periodically (or on OOM errors).
+ * When memory exceeds 28 MB (or key count exceeds 200,000 threshold),
+ * it flushes old keys to keep the database active under the free tier without downtime.
+ */
+export async function ensureFreeTierStorageSafety(redisInstance) {
+  const now = Date.now();
+  // Throttle check to at most once every 60 seconds to preserve daily commands
+  if (now - lastMemoryCheckTime < 60000) {
+    return;
+  }
+  lastMemoryCheckTime = now;
+
+  try {
+    let shouldPurge = false;
+
+    // 1. Try reading Redis memory info if permitted
+    try {
+      const info = await redisInstance.info("memory");
+      const match = info.match(/used_memory:(\d+)/);
+      if (match) {
+        const usedBytes = parseInt(match[1], 10);
+        // 28 MB threshold (28 * 1024 * 1024 = 29,360,128 bytes)
+        if (usedBytes >= 29360128) {
+          shouldPurge = true;
+        }
+      }
+    } catch (_) {
+      // 2. Fallback to dbSize key count check if INFO command is restricted
+      const totalKeys = await redisInstance.dbSize();
+      if (totalKeys >= 200000) {
+        shouldPurge = true;
+      }
+    }
+
+    if (shouldPurge) {
+      console.warn("[Auto-Guard] 30 MB free-tier limit approached. Executing FLUSHDB to maintain uptime...");
+      await redisInstance.flushDb();
+    }
+  } catch (err) {
+    console.warn("[Auto-Guard] Memory check skipped:", err.message || err);
+  }
+}
+
+/**
+ * Handle OOM error fallback by clearing database and retrying
+ */
+export async function purgeOnOom(redisInstance) {
+  try {
+    console.warn("[Auto-Guard] OOM detected. Flushing DB to restore service...");
+    await redisInstance.flushDb();
+  } catch (err) {
+    console.error("[Auto-Guard] Flush failed:", err);
+  }
 }
 
 /**

@@ -1,4 +1,4 @@
-import { getRedis, packLink, unpackLink, generateShortCode } from "./_redis.js";
+import { getRedis, packLink, unpackLink, generateShortCode, ensureFreeTierStorageSafety, purgeOnOom } from "./_redis.js";
 
 export default async function handler(request, response) {
   // CORS
@@ -16,7 +16,6 @@ export default async function handler(request, response) {
     if (request.method === "GET") {
       let keys = [];
       try {
-        // Prefer bounded SCAN over blocking KEYS command
         const scanRes = await redis.scan(0, { MATCH: "link:*", COUNT: 20 });
         keys = scanRes.keys || [];
       } catch (_) {
@@ -28,7 +27,6 @@ export default async function handler(request, response) {
         return response.status(200).json({ links: [] });
       }
 
-      // MGET batch lookup in a single round-trip instead of serial GETs
       const rawValues = await redis.mGet(topKeys);
       const links = [];
       for (let i = 0; i < topKeys.length; i++) {
@@ -53,7 +51,9 @@ export default async function handler(request, response) {
       const trimmedUrl = originalUrl.trim();
       const now = Date.now();
 
-      // Atomic SETNX collision check loop with max 5 attempts
+      // Check storage guard to prevent exceeding 30 MB free-tier limit
+      await ensureFreeTierStorageSafety(redis);
+
       let shortCode = "";
       let created = false;
 
@@ -61,11 +61,23 @@ export default async function handler(request, response) {
         shortCode = generateShortCode(5);
         const packed = packLink(trimmedUrl, 0, now);
 
-        // NX: Only set the key if it does not already exist (atomic check-and-set)
-        const setRes = await redis.set(`link:${shortCode}`, packed, { NX: true });
-        if (setRes === "OK" || setRes === true) {
-          created = true;
-          break;
+        try {
+          const setRes = await redis.set(`link:${shortCode}`, packed, { NX: true });
+          if (setRes === "OK" || setRes === true) {
+            created = true;
+            break;
+          }
+        } catch (setErr) {
+          if (setErr.message && setErr.message.includes("OOM")) {
+            await purgeOnOom(redis);
+            const retryRes = await redis.set(`link:${shortCode}`, packed, { NX: true });
+            if (retryRes === "OK" || retryRes === true) {
+              created = true;
+              break;
+            }
+          } else {
+            throw setErr;
+          }
         }
       }
 
@@ -73,7 +85,6 @@ export default async function handler(request, response) {
         return response.status(500).json({ error: "Failed to generate unique short link. Please retry." });
       }
 
-      // Construct return link object identical to existing API schema
       const link = {
         id: shortCode,
         original_url: trimmedUrl,
