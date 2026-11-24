@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="foldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFB56B" />
+      <stop offset="50%" stop-color="#FF9D42" />
+      <stop offset="100%" stop-color="#FF6200" />
+    </linearGradient>
+    <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="16" flood-color="#FF9D42" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="#111111" />
+  <rect width="508" height="508" x="2" y="2" rx="110" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="2" />
+
+  <g filter="url(#subtleGlow)">
+    <path 
+      d="M 374 156 
+         C 334 104 274 88 212 88 
+         C 120 88 76 162 76 256 
+         C 76 350 120 424 212 424 
+         C 284 424 346 398 382 344" 
+      fill="none" 
+      stroke="url(#foldGrad)" 
+      stroke-width="52" 
+      stroke-linecap="round" />
+
+    <path 
+      d="M 194 256 L 372 256 
+         M 314 198 L 372 256 L 314 314" 
+      fill="none" 
+      stroke="url(#foldGrad)" 
+      stroke-width="50" 
+      stroke-linecap="round" 
+      stroke-linejoin="round" />
+  </g>
+</svg>

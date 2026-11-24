@@ -55,6 +55,10 @@ export default function App() {
       <main className="page">
         <section className="hero">
           <div className="hero-copy">
+            <div className="brand-header">
+              <img src="/brand-mark.svg" alt="ClipLink Logo" className="brand-logo" width="36" height="36" />
+              <span className="brand-name">ClipLink</span>
+            </div>
             <p className="eyebrow">Fast URL Shortening</p>
             <h1>Shorten links without the mess.</h1>
             <p className="hero-text">
